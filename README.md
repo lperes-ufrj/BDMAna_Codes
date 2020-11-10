@@ -6,4 +6,5 @@ cd srcs
 make 
 
 To run 
-./BDMAnalysis <input file>
+
+./BDMAnalysis < input file >
