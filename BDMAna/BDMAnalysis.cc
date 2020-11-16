@@ -108,6 +108,7 @@ void ResetCounters( CounterMap_t& Multiplicity, KinematicMap_t& Px, KinematicMap
         InitPosX[type].resize( 0 );
         InitPosY[type].resize( 0 );
         InitPosZ[type].resize( 0 );
+        Mass[type].resize( 0 );
      // EndPosX[type].clear();
      // EndPosY[type].clear();
      // EndPosZ[type].clear();
