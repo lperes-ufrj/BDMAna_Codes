@@ -42,7 +42,7 @@ void InitTreeGen( TTree* pTree, int& Event, int& Run, int& SubRun, double& Momen
     pTree->Branch("runNo", &Run);
     pTree->Branch("subRunNo", &SubRun);
 
-    pTree->Branch( "MomentumNotConserved", &MomentumDiff);
+    pTree->Branch( "MomentumNotConserved", &MomentumDiff );
     pTree->Branch( "IsMomentumConserved", &IsConserved );
 
 }
@@ -78,18 +78,18 @@ int main( int argc, char ** argv ) {
         Run    = ev.eventAuxiliary().run();
         SubRun = ev.eventAuxiliary().subRun();
         
-        std::cout << "Processing "
+      /*  std::cout << "Processing "
                   << "Run " << ev.eventAuxiliary().run() << ", "
-                  << "Event " << ev.eventAuxiliary().event() << std::endl;
+                  << "Event " << ev.eventAuxiliary().event() << std::endl;*/
 
         auto const& MCTruthHandle = ev.getValidHandle< std::vector< simb::MCTruth > >( MCTruthTag );
         auto const& MCTruthObjs = *MCTruthHandle;
+        TLorentzVector EventMomentum, iP, fP;
 
         for ( size_t iMCTruth = 0; iMCTruth < MCTruthObjs.size(); ++iMCTruth ) {
 
             simb::MCTruth MCTruthObj = MCTruthObjs[iMCTruth];
             int nParticles = MCTruthObj.NParticles();
-            TLorentzVector EventMomentum, iP, fP;
 
             // Check the momentum and energy conservation in an interaction
             for ( int iParticle = 0; iParticle < nParticles; ++iParticle ) {
@@ -103,21 +103,27 @@ int main( int argc, char ** argv ) {
                 else if (  MCParticleObj.StatusCode() == 1 || MCParticleObj.StatusCode() == 15 ) fP += iMomentum;
             } // Loop over MCParticles for each MCTruth
 
-            EventMomentum = fP - iP;
-            if ( std::abs( EventMomentum.M2() ) > 1e-10 ) {
-                //std::cout << "MCTruth " << iMCTruth << " doesn't conserve the momentum and energy.  The total 4-momentum is ( " << EventMomentum.Px() << ", " << EventMomentum.Py() << ", " << EventMomentum.Pz() << ", " << EventMomentum.E() << " )." << std::endl;
-                IsPConserved = false;
-                n_ev+=1;
-                MomentumDiff = std::abs( EventMomentum.M2() );
-            } else {
-                IsPConserved = true;
-            }
-
-           
+         
         } // Loop over MCTruth
-        
-        fTree->Fill();
+           
+        EventMomentum = fP - iP;
+        if ( std::abs( EventMomentum.M2() ) > 1e-10 ) {
+
+            //std::cout << "MCTruth " << iMCTruth << " doesn't conserve the momentum and energy.  The total 4-momentum is ( " << EventMomentum.Px() << ", " << EventMomentum.Py() << ", " << EventMomentum.Pz() << ", " << EventMomentum.E() << " )." << std::endl;
+            IsPConserved = false;
+            //std::cout << "Event Momentum Difference is: " << EventMomentum.M2() << "\tEvent " << ev.eventAuxiliary().event() << std::endl;
+            n_ev+=1;
+            MomentumDiff = std::abs( EventMomentum.M2() );
+            fTree->Fill();
+                
+        } else {
+            
+            IsPConserved = true;
+        }
+       
+        //std::cout << "Event Momentum Difference is: " << EventMomentum.M2() << std::endl;
         MomentumDiff=0;
+    
     }
     
     std::cout << "Number of events that did not conserve 4-momentum: " << n_ev << std::endl;
