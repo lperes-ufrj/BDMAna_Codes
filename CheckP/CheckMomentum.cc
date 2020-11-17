@@ -68,12 +68,12 @@ int main( int argc, char ** argv ) {
     // keep track of how many events do not conserve 4-momentum
     int n_ev = 0;
     int num_ev = 0;
-    bool stop = true;
+    
 
-    for ( gallery::Event ev( Filenames ); stop/*!ev.atEnd()*/; ev.next() ) {
+    for ( gallery::Event ev( Filenames ); !ev.atEnd(); ev.next() ) {
         
         num_ev++;
-        if(num_ev>4999) stop=false;
+        if(num_ev>4999) break;
         Event  = ev.eventAuxiliary().event();
         Run    = ev.eventAuxiliary().run();
         SubRun = ev.eventAuxiliary().subRun();
