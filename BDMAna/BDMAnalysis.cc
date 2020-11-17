@@ -372,11 +372,11 @@ int main( int argc, char ** argv ) {
     InitTreeGen( fTree, MultiplicityGen, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass );
    
     int num_ev = 0;
-    bool stop = true;
-    for ( gallery::Event ev( Filenames ); stop	/*!ev.atEnd()*/; ev.next() ) {
+    
+    for ( gallery::Event ev( Filenames ); !ev.atEnd() ; ev.next() ) {
 
         num_ev++;
-        if(num_ev>4999) stop=false;
+        if(num_ev>4999) break;
         for ( auto& multPair: MultiplicityGen ) multPair.second = 0;
     
         std::cout << "Processing "
