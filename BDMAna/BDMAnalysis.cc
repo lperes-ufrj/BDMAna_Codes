@@ -46,6 +46,7 @@ Adapted by Leonardo Peres from a series of Yun-Tse's original codes
 #define ARGON39_CODE 1000180390
 #define CL39_CODE 1000170390
 #define GEN_PART_CODE 2000000000
+#define VISIBLE_PART_CODE 2000000400
   
 using CounterMap_t = std::map< int, unsigned int >;
 using KinematicMap_t = std::map< int, std::vector< double > >;
@@ -65,8 +66,8 @@ void SetParticleTypes( std::vector< int >& ParticleTypes ) {
     ParticleTypes.push_back( IN_DM_CODE );  // Incident dark matter
     ParticleTypes.push_back( OUT_DM_CODE ); // Outgoing dark matter
     ParticleTypes.push_back( GEN_PART_CODE );  // GENIE artifacts
- /* ParticleTypes.push_back( 2000000400 ); // All the visible particles and neutrons ( not GENIE artifacts, nor DMs, Ar40, Ar39, Cl39 )
-    ParticleTypes.push_back( 2000000401 ); // All the visible particles but not neutrons
+    ParticleTypes.push_back( VISIBLE_PART_CODE ); // All the visible particles  ( not GENIE artifacts, nor DMs, Ar40, Ar39, Cl39 and neutrons )
+ /* ParticleTypes.push_back( 2000000401 ); // All the visible particles but not neutrons
     ParticleTypes.push_back( 2000000410 ); // Leading particle among all the visible particles and neutrons
     ParticleTypes.push_back( 2000000411 ); // Leading particle among all the visible particles but not neutrons
     ParticleTypes.push_back( 2000000412 ); // Leading proton */
@@ -159,6 +160,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "nCl39Gen", &MultipGen[CL39_CODE], "nCl39Gen/i" );
     pTree->Branch( "nDMsGen", &MultipGen[OUT_DM_CODE], "nDMsGen/i" );
     pTree->Branch( "nGENIEGen", &MultipGen[GEN_PART_CODE], "nGENIEGen/i" );
+    pTree->Branch( "nVisibleGen", &MultipGen[VISIBLE_PART_CODE], "nVisibleGen/i" );
 
     
     // Variables for each final state particle
@@ -172,6 +174,18 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "AllPartInitPosY", &InitPosY[ALL_PART_CODE] );
     pTree->Branch( "AllPartInitPosZ", &InitPosZ[ALL_PART_CODE] );
     pTree->Branch( "AllPartMass", &Mass[ALL_PART_CODE] );
+
+
+    pTree->Branch( "VisiblePx", &Px[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisiblePy", &Py[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisiblePz", &Pz[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleP", &P[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleE", &E[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleAngle", &Angle[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleInitPosX", &InitPosX[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleInitPosY", &InitPosY[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleInitPosZ", &InitPosZ[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleMass", &Mass[VISIBLE_PART_CODE] );
     
 
     pTree->Branch( "ProtonPx", &Px[PROTONS_CODE] );
@@ -372,11 +386,13 @@ int main( int argc, char ** argv ) {
     InitTreeGen( fTree, MultiplicityGen, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass );
    
     int num_ev = 0;
-    
+    bool stop = true;
     for ( gallery::Event ev( Filenames ); !ev.atEnd() ; ev.next() ) {
 
-        num_ev++;
+        
         if(num_ev>4999) break;
+        num_ev++;
+        
         for ( auto& multPair: MultiplicityGen ) multPair.second = 0;
     
         std::cout << "Processing "
@@ -396,6 +412,7 @@ int main( int argc, char ** argv ) {
 
             TLorentzVector DMMomemtum;
 
+            //We need incoming momentum DM first to compare with the other particles
             for ( int iParticle = 0; iParticle < nParticles; ++iParticle ) {
 
                 const simb::MCParticle& MCParticleObjDMIn = MCTruthObj.GetParticle( iParticle );
@@ -413,6 +430,9 @@ int main( int argc, char ** argv ) {
 
                 const simb::MCParticle& MCParticleObj = MCTruthObj.GetParticle( iPart );
                 int pdgCode = MCParticleObj.PdgCode();
+                
+                // Flags for Visible particles
+                //bool Meson_flag, Baryon_flag, Proton_flag = false;
 
               //if(pdgCode == IN_DM_CODE || pdgCode == OUT_DM_CODE){  // CHECKING THINGS...
               /*  if(std::abs(pdgCode) == PROTONS_CODE){
@@ -431,14 +451,18 @@ int main( int argc, char ** argv ) {
                     
                     SaveInfo( MCParticleObj, GEN_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
-                } else if ( abs(pdgCode) > MESONS_CODE && abs(pdgCode) < 400 ) {
+                } else if ( abs(pdgCode) > MESONS_CODE && abs(pdgCode) < 400 || abs(pdgCode) == 130) {
 
                     SaveInfo( MCParticleObj, MESONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
-                   
+                    
+                    SaveInfo( MCParticleObj, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                
                 } else if ( abs(pdgCode) > BARYONS_CODE && abs(pdgCode) < 4000 ) {
 
                    SaveInfo( MCParticleObj, BARYONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
-                        
+
+                   SaveInfo( MCParticleObj, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+
                 } else if ( pdgCode == OUT_DM_CODE && MCParticleObj.StatusCode() == 1 ) {
 
                     SaveInfo( MCParticleObj, OUT_DM_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
@@ -446,6 +470,8 @@ int main( int argc, char ** argv ) {
                 } else if ( abs(pdgCode) == PROTONS_CODE ) {
 
                     SaveInfo( MCParticleObj, PROTONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+
+                    SaveInfo( MCParticleObj, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( abs(pdgCode) == NEUTRONS_CODE ) {
 
@@ -455,10 +481,14 @@ int main( int argc, char ** argv ) {
 
                     SaveInfo( MCParticleObj, CH_PIONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                 
+                    SaveInfo( MCParticleObj, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+
                 } else if ( abs(pdgCode) == NE_PIONS_CODE ) {
 
                     SaveInfo( MCParticleObj, NE_PIONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                
+                    SaveInfo( MCParticleObj, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+
                 } else if ( abs(pdgCode) == ARGON40_CODE ) {
 
                     SaveInfo( MCParticleObj, ARGON40_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
@@ -476,7 +506,6 @@ int main( int argc, char ** argv ) {
                     SaveInfo( MCParticleObj, GEN_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                     
                 }
-               
 
             } // Loop over MCParticles for each MCTruth
             
