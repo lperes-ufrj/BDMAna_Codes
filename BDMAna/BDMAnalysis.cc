@@ -92,7 +92,7 @@ double CalculateAngle( TLorentzVector DMP, TLorentzVector ParticleP ) {
 
 }
 
-void ResetCounters( CounterMap_t& Multiplicity, KinematicMap_t& PdgCode, KinematicMap_t& Px, KinematicMap_t& Py, KinematicMap_t& Pz, KinematicMap_t& P, KinematicMap_t& E, KinematicMap_t& Angle, KinematicMap_t& InitPosX, KinematicMap_t& InitPosY, KinematicMap_t& InitPosZ, /*KinematicMap_t& EndPosX, KinematicMap_t& EndPosY, KinematicMap_t& EndPosZ,*/ KinematicMap_t& Mass ) {
+void ResetCounters( CounterMap_t& Multiplicity, KinematicMap_t& PdgCode, KinematicMap_t& StatusCode, KinematicMap_t& Px, KinematicMap_t& Py, KinematicMap_t& Pz, KinematicMap_t& P, KinematicMap_t& E, KinematicMap_t& Angle, KinematicMap_t& InitPosX, KinematicMap_t& InitPosY, KinematicMap_t& InitPosZ, /*KinematicMap_t& EndPosX, KinematicMap_t& EndPosY, KinematicMap_t& EndPosZ,*/ KinematicMap_t& Mass ) {
 
     std::vector< int > ParticleTypes;
     SetParticleTypes( ParticleTypes );
@@ -111,6 +111,7 @@ void ResetCounters( CounterMap_t& Multiplicity, KinematicMap_t& PdgCode, Kinemat
         InitPosY[type].resize( 0 );
         InitPosZ[type].resize( 0 );
         Mass[type].resize( 0 );
+        StatusCode[type].resize( 0 );
      // EndPosX[type].clear();
      // EndPosY[type].clear();
      // EndPosZ[type].clear();
@@ -118,7 +119,7 @@ void ResetCounters( CounterMap_t& Multiplicity, KinematicMap_t& PdgCode, Kinemat
 }
 
 
-void SaveInfo( auto const& TruthObj, KinematicMap_t& PdgCodeSI, int PDGCode, CounterMap_t& MultiplicitySI,  KinematicMap_t& PxSI, KinematicMap_t& PySI, KinematicMap_t& PzSI, KinematicMap_t& PSI, KinematicMap_t& ESI, TLorentzVector& DMMomemtumSI, KinematicMap_t& AngleSI, KinematicMap_t& InitPosXSI, KinematicMap_t& InitPosYSI, KinematicMap_t& InitPosZSI, /*KinematicMap_t& EndPosXSI, KinematicMap_t& EndPosYSI, KinematicMap_t& EndPosZSI,*/ KinematicMap_t& MassSI){
+void SaveInfo( auto const& TruthObj, KinematicMap_t& PdgCodeSI, int PDGCode, KinematicMap_t& StatusCodeSI, CounterMap_t& MultiplicitySI,  KinematicMap_t& PxSI, KinematicMap_t& PySI, KinematicMap_t& PzSI, KinematicMap_t& PSI, KinematicMap_t& ESI, TLorentzVector& DMMomemtumSI, KinematicMap_t& AngleSI, KinematicMap_t& InitPosXSI, KinematicMap_t& InitPosYSI, KinematicMap_t& InitPosZSI, /*KinematicMap_t& EndPosXSI, KinematicMap_t& EndPosYSI, KinematicMap_t& EndPosZSI,*/ KinematicMap_t& MassSI){
 
     double ang = CalculateAngle( DMMomemtumSI, TruthObj.Momentum(0) );
     MultiplicitySI[PDGCode]++;
@@ -134,6 +135,7 @@ void SaveInfo( auto const& TruthObj, KinematicMap_t& PdgCodeSI, int PDGCode, Cou
     PxSI[PDGCode].push_back(TruthObj.Px(0));
     PySI[PDGCode].push_back(TruthObj.Py(0));
     PzSI[PDGCode].push_back(TruthObj.Pz(0));
+    StatusCodeSI[PDGCode].push_back(TruthObj.StatusCode());
 
     PSI[PDGCode].push_back(TruthObj.P(0));
     ESI[PDGCode].push_back(TruthObj.E(0));
@@ -143,7 +145,7 @@ void SaveInfo( auto const& TruthObj, KinematicMap_t& PdgCodeSI, int PDGCode, Cou
 }
 
 
-CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t& PDG, KinematicMap_t& Px, KinematicMap_t& Py, KinematicMap_t& Pz, KinematicMap_t& P, KinematicMap_t& E, KinematicMap_t& Angle, KinematicMap_t& InitPosX, KinematicMap_t& InitPosY, KinematicMap_t& InitPosZ, /*KinematicMap_t& EndPosX, KinematicMap_t& EndPosY, KinematicMap_t& EndPosZ, */KinematicMap_t& Mass ) {
+CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t& PDG, KinematicMap_t& StatusCode, KinematicMap_t& Px, KinematicMap_t& Py, KinematicMap_t& Pz, KinematicMap_t& P, KinematicMap_t& E, KinematicMap_t& Angle, KinematicMap_t& InitPosX, KinematicMap_t& InitPosY, KinematicMap_t& InitPosZ, /*KinematicMap_t& EndPosX, KinematicMap_t& EndPosY, KinematicMap_t& EndPosZ, */KinematicMap_t& Mass ) {
 
   //  CounterMap_t* pMultipGen = new CounterMap_t;
   //  CounterMap_t& MultipGen = (*pMultipGen);
@@ -177,6 +179,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "AllPartInitPosZ", &InitPosZ[ALL_PART_CODE] );
     pTree->Branch( "AllPartMass", &Mass[ALL_PART_CODE] );
     pTree->Branch( "AllPartPDG", &PDG[ALL_PART_CODE] );
+    pTree->Branch( "AllPartStatusCode", &StatusCode[ALL_PART_CODE] );
 
 
     pTree->Branch( "VisiblePx", &Px[VISIBLE_PART_CODE] );
@@ -190,6 +193,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "VisibleInitPosZ", &InitPosZ[VISIBLE_PART_CODE] );
     pTree->Branch( "VisibleMass", &Mass[VISIBLE_PART_CODE] );
     pTree->Branch( "VisiblePDG", &PDG[VISIBLE_PART_CODE] );
+    pTree->Branch( "VisibleStatusCode", &StatusCode[VISIBLE_PART_CODE] );
     
 
     pTree->Branch( "ProtonPx", &Px[PROTONS_CODE] );
@@ -203,6 +207,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "ProtonInitPosZ", &InitPosZ[PROTONS_CODE] );
     pTree->Branch( "ProtonMass", &Mass[PROTONS_CODE] );
     pTree->Branch( "ProtonPDG", &PDG[PROTONS_CODE] );
+    pTree->Branch( "ProtonStatusCode", &StatusCode[PROTONS_CODE] );
 
     
     pTree->Branch( "NeutronPx", &Px[NEUTRONS_CODE] );
@@ -216,6 +221,8 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "NeutronInitPosZ", &InitPosZ[NEUTRONS_CODE] );
     pTree->Branch( "NeutronMass", &Mass[NEUTRONS_CODE] );
     pTree->Branch( "NeutronPDG", &PDG[NEUTRONS_CODE] );
+    pTree->Branch( "NeutronStatusCode", &StatusCode[NEUTRONS_CODE] );
+    
 
 
     pTree->Branch( "PionPx", &Px[CH_PIONS_CODE] );
@@ -229,6 +236,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "PionInitPosZ", &InitPosZ[CH_PIONS_CODE] );
     pTree->Branch( "PionMass", &Mass[CH_PIONS_CODE] );
     pTree->Branch( "PionPDG", &PDG[CH_PIONS_CODE] );
+    pTree->Branch( "PionStatusCode", &StatusCode[CH_PIONS_CODE] );
 
 
     pTree->Branch( "Pi0Px", &Px[NE_PIONS_CODE] );
@@ -242,6 +250,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "Pi0InitPosZ", &InitPosZ[NE_PIONS_CODE] );
     pTree->Branch( "Pi0Mass", &Mass[NE_PIONS_CODE] );
     pTree->Branch( "Pi0PDG", &PDG[NE_PIONS_CODE] );
+    pTree->Branch( "Pi0StatusCode", &StatusCode[NE_PIONS_CODE] );
 
     
     pTree->Branch( "MesonPx", &Px[MESONS_CODE] );
@@ -254,6 +263,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "MesonInitPosZ", &InitPosZ[MESONS_CODE] );
     pTree->Branch( "MesonMass", &Mass[MESONS_CODE] );
     pTree->Branch( "MesonPDG", &PDG[MESONS_CODE] );
+    pTree->Branch( "MesonStatusCode", &StatusCode[MESONS_CODE] );
     
 
     pTree->Branch( "BaryonPx", &Px[BARYONS_CODE] );
@@ -267,6 +277,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "BaryonInitPosZ", &InitPosZ[BARYONS_CODE] );
     pTree->Branch( "BaryonMass", &Mass[BARYONS_CODE] );
     pTree->Branch( "BaryonPDG", &PDG[BARYONS_CODE] );
+    pTree->Branch( "BaryonStatusCode", &StatusCode[BARYONS_CODE] );
 
     
     pTree->Branch( "Ar40Px", &Px[ARGON40_CODE] );
@@ -280,6 +291,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "Ar40InitPosZ", &InitPosZ[ARGON40_CODE] );
     pTree->Branch( "Ar40Mass", &Mass[ARGON40_CODE] );
     pTree->Branch( "Ar40PDG", &PDG[ARGON40_CODE] );
+    pTree->Branch( "Ar40StatusCode", &StatusCode[ARGON40_CODE] );
 
 
     pTree->Branch( "Ar39Px", &Px[ARGON39_CODE] );
@@ -293,6 +305,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "Ar39InitPosZ", &InitPosZ[ARGON39_CODE] );
     pTree->Branch( "Ar39Mass", &Mass[ARGON39_CODE] );
     pTree->Branch( "Ar39PDG", &PDG[ARGON39_CODE] );
+    pTree->Branch( "Ar39StatusCode", &StatusCode[ARGON39_CODE] );
 
 
     pTree->Branch( "Cl39Px", &Px[CL39_CODE] );
@@ -306,6 +319,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "Cl39InitPosZ", &InitPosZ[CL39_CODE] );
     pTree->Branch( "Cl39Mass", &Mass[CL39_CODE] );
     pTree->Branch( "Cl39PDG", &PDG[CL39_CODE] );
+    pTree->Branch( "Cl39StatusCode", &StatusCode[CL39_CODE] );
 
 
     pTree->Branch( "InDMPx", &Px[IN_DM_CODE] );
@@ -319,6 +333,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "InDMInitPosZ", &InitPosZ[IN_DM_CODE] );
     pTree->Branch( "InDMMass", &Mass[IN_DM_CODE] );
     pTree->Branch( "InDMPDG", &PDG[IN_DM_CODE] );
+    pTree->Branch( "InDMStatusCode", &StatusCode[IN_DM_CODE] );
 
 
     pTree->Branch( "OutDMPx", &Px[OUT_DM_CODE] );
@@ -332,6 +347,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "OutDMInitPosZ", &InitPosZ[OUT_DM_CODE] );
     pTree->Branch( "OutDMMass", &Mass[OUT_DM_CODE] );
     pTree->Branch( "OutDMPDG", &PDG[OUT_DM_CODE] );
+    pTree->Branch( "OutDMStatusCode", &StatusCode[OUT_DM_CODE] );
    
 
     pTree->Branch( "GENIEPx", &Px[GEN_PART_CODE] );
@@ -345,6 +361,7 @@ CounterMap_t* InitTreeGen( TTree* pTree, CounterMap_t& MultipGen, KinematicMap_t
     pTree->Branch( "GENIEInitPosZ", &InitPosZ[GEN_PART_CODE] );
     pTree->Branch( "GENIEMass", &Mass[GEN_PART_CODE] );
     pTree->Branch( "GENIEPDG", &PDG[GEN_PART_CODE] );
+    pTree->Branch( "GENIEStatusCode", &StatusCode[GEN_PART_CODE] );
 
 
  /*
@@ -391,15 +408,17 @@ int main( int argc, char ** argv ) {
     std::string GenLabel = "bdm";
     art::InputTag MCTruthTag { GenLabel };
 
+    std::cout << argv[1] << std::endl;
+
     TFile *fOut = new TFile( "BDM_MCAnalysis.root", "RECREATE" );
     TTree *fTree = new TTree( "MCParticles", "Primary MC Particles" );
    
 
-    KinematicMap_t Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass,  pdgCode_info;
+    KinematicMap_t Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass,  pdgCode_info, statusCode;
     CounterMap_t MultiplicityGen;
 
 
-    InitTreeGen( fTree, MultiplicityGen, pdgCode_info, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass );
+    InitTreeGen( fTree, MultiplicityGen, pdgCode_info, statusCode, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass );
    
     int num_ev = 0;
     bool stop = true;
@@ -418,7 +437,7 @@ int main( int argc, char ** argv ) {
         auto const& MCTruthHandle = ev.getValidHandle< std::vector< simb::MCTruth > >( MCTruthTag );
         auto const& MCTruthObjs = *MCTruthHandle;
 
-        ResetCounters(MultiplicityGen, pdgCode_info, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+        ResetCounters(MultiplicityGen, pdgCode_info, statusCode, Px, Py, Pz, P, E, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
         
 
         for ( size_t iMCTruth = 0; iMCTruth < MCTruthObjs.size(); ++iMCTruth ) {
@@ -437,7 +456,7 @@ int main( int argc, char ** argv ) {
                 if ( pdgCode == OUT_DM_CODE && MCParticleObjDMIn.StatusCode() == 0 ) {
 
                     DMMomemtum = MCParticleObjDMIn.Momentum(0); 
-                    SaveInfo( MCParticleObjDMIn, pdgCode_info, IN_DM_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObjDMIn, pdgCode_info, IN_DM_CODE, statusCode ,MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                     
                 }
             }
@@ -461,65 +480,65 @@ int main( int argc, char ** argv ) {
                     std::cout << std::endl;
                 }*/
                // std::cout << "DM Px: " << DMMomemtum.Px() << std::endl;
-                SaveInfo( MCParticleObj, pdgCode_info, ALL_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                SaveInfo( MCParticleObj, pdgCode_info, ALL_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 if ( pdgCode > GEN_PART_CODE && pdgCode != OUT_DM_CODE ) { 
                     
-                    SaveInfo( MCParticleObj, pdgCode_info, GEN_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, GEN_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( abs(pdgCode) > MESONS_CODE && abs(pdgCode) < 400 || abs(pdgCode) == 130) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, MESONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, MESONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                     
-                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                 
                 } else if ( abs(pdgCode) > BARYONS_CODE && abs(pdgCode) < 4000 ) {
 
-                   SaveInfo( MCParticleObj, pdgCode_info, BARYONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                   SaveInfo( MCParticleObj, pdgCode_info, BARYONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
-                   SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                   SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( pdgCode == OUT_DM_CODE && MCParticleObj.StatusCode() == 1 ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, OUT_DM_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, OUT_DM_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                    
                 } else if ( abs(pdgCode) == PROTONS_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, PROTONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, PROTONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
-                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( abs(pdgCode) == NEUTRONS_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, NEUTRONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, NEUTRONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                 
                 } else if ( abs(pdgCode) == CH_PIONS_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, CH_PIONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, CH_PIONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                 
-                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( abs(pdgCode) == NE_PIONS_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, NE_PIONS_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, NE_PIONS_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                
-                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, VISIBLE_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
 
                 } else if ( abs(pdgCode) == ARGON40_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, ARGON40_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, ARGON40_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                
                 } else if ( abs(pdgCode) == ARGON39_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, ARGON39_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, ARGON39_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
              
                 } else if ( abs(pdgCode) == CL39_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, CL39_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, CL39_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                 
                 } else if ( abs(pdgCode) == GEN_PART_CODE ) {
 
-                    SaveInfo( MCParticleObj, pdgCode_info, GEN_PART_CODE, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
+                    SaveInfo( MCParticleObj, pdgCode_info, GEN_PART_CODE, statusCode, MultiplicityGen, Px,  Py, Pz, P, E, DMMomemtum, Angle, InitPosX, InitPosY, InitPosZ, /*EndPosX, EndPosY, EndPosZ,*/ Mass);
                     
                 }
 
