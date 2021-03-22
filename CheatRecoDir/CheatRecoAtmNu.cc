@@ -178,8 +178,18 @@ void ResetCounters(auto &EventNo,
 int main(int argc, char **argv)
 {
 
+    //std::string ListOfFiles;
+    std::ifstream ListOfFiles(argv[1]);
+
     std::vector<std::string> filenames;
-    filenames.push_back(argv[1]);
+    std::copy(std::istream_iterator<std::string>(ListOfFiles),
+              std::istream_iterator<std::string>(),
+              std::back_inserter(filenames));
+
+    for (size_t i = 0; i < filenames.size(); i++)
+    {
+        std::cout << "filenames at " << i << "is" << filenames[i] << std::endl;
+    }
 
     std::string PandoraLabel = "pandora";
     art::InputTag fPandoraLabel{PandoraLabel};
@@ -203,12 +213,11 @@ int main(int argc, char **argv)
     TFile *fOut = new TFile("Bg_RecoParticles.root", "RECREATE");
     TTree *fTree = new TTree("RecoParticles", " Reco Info from atmnu sample");
 
-    int inteventno, intrunno, intsubrunno, nPrimaries, nPFParticle;
-    std::vector<double> nPFParticleVtxDaughters, nDaughters, nPFParticleTrkDaughters, nPFParticleSwrDaughters, 
-    DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs,SwrID;
-    std::vector<int> PFParticleID, VtxStatus, VtxID, PFP_PdgCode, PFP_Parent, intCCNC;
+    int inteventno, intrunno, intsubrunno, nPrimaries, nPFParticle, nPFParticleVtxDaughters, nPFParticleTrkDaughters, nPFParticleSwrDaughters;
+    std::vector<double> DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs, SwrID;
+    std::vector<int> PFParticleID, VtxStatus, VtxID, PFP_PdgCode, PFP_Parent, intCCNC, nDaughters;
     double XYZ[3] = {0.0, 0.0, 0.0};
-    std::vector<TVector3> VtxXYZ, DaughterVertexTrack, SwrDirection, SwrDirectionErr,SwrShowerStart,SwrShowerStartErr;
+    std::vector<TVector3> VtxXYZ, DaughterVertexTrack, SwrDirection, SwrDirectionErr, SwrShowerStart, SwrShowerStartErr;
 
     InitTreeGen(fTree,
                 inteventno,
@@ -287,14 +296,14 @@ int main(int argc, char **argv)
         auto const &MCTruthHandle = ev.getValidHandle<std::vector<simb::MCTruth>>(fGeneratorLabel);
         auto const &MCTruthObjs = *MCTruthHandle;
 
-        // SAVE TRUE INTERACTION CC OR NC =================================
+        // SAVE TRUE INTERACTION CC OR NC   // 0=CC 1=NC =================================
 
         for (size_t i = 0; i < MCTruthObjs.size(); i++)
         {
             simb::MCTruth MCTruthObj = MCTruthObjs[i];
             simb::MCNeutrino const &thisNu = MCTruthObj.GetNeutrino();
-            intCCNC.push_back(thisNu.CCNC());
-            std::cout << "thisNu.CCNC() = " << thisNu.CCNC() << std::endl;
+            intCCNC.push_back(thisNu.CCNC());  // 0=CC 1=NC
+            //std::cout << "thisNu.CCNC() = " << thisNu.CCNC() << std::endl;
         }
 
         // RECO INFORMATION ===============================================
@@ -327,17 +336,26 @@ int main(int argc, char **argv)
             nDaughters.push_back(PandoraPfparticleObjs[iPfp].NumDaughters());
             PFParticleID.push_back(PandoraPfparticleObjs[iPfp].Self());
             PFP_Parent.push_back(PandoraPfparticleObjs[iPfp].Parent());
-            if (!(PandoraPfparticleObjs[iPfp].IsPrimary() && (std::abs(PandoraPfparticleObjs[iPfp].PdgCode()) == 14 || std::abs(PandoraPfparticleObjs[iPfp].PdgCode()) == 12)))
+            if (PandoraPfparticleObjs[iPfp].IsPrimary() && (std::abs(PandoraPfparticleObjs[iPfp].PdgCode()) == 14 || std::abs(PandoraPfparticleObjs[iPfp].PdgCode()) == 12))
                 PandoraNuIDs.push_back(PandoraPfparticleObjs[iPfp].Self());
         }
 
+        //std::cout << "PandoraNuIDs.size() = " << PandoraNuIDs.size() << std::endl;
+        
+        if(PandoraNuIDs.size() == 0) continue;  
+        
+        //FROM NOW ON, ONLY SAVE DAUGHTERS INFORMATION OF PANDORA NEUTRINOS PRIMARIES
 
         for (size_t iPfp = 0; iPfp < PandoraPfparticleObjs.size(); iPfp++)
         {
 
+            if (PandoraPfparticleObjs[iPfp].Parent() != PandoraNuIDs[0]) // Only daughters
+                continue; 
+
             auto const &Pfp_trk = PandoraPfp_trk.at(iPfp);
 
             nPFParticleTrkDaughters += Pfp_trk.size();
+
             if (!Pfp_trk.empty())
             {
                 for (size_t i = 0; i < Pfp_trk.size(); i++)
@@ -346,6 +364,7 @@ int main(int argc, char **argv)
                     DaughterTrackLengths.push_back(thisTrkPfp->Length());
                     DaughterStartMomentumTrack.push_back(thisTrkPfp->StartMomentum());
                     DaughterEndMomentumTrack.push_back(thisTrkPfp->EndMomentum());
+
                 }
             }
         }
@@ -353,37 +372,47 @@ int main(int argc, char **argv)
         for (size_t iPfp = 0; iPfp < PandoraPfparticleObjs.size(); iPfp++)
         {
 
+            if (PandoraPfparticleObjs[iPfp].Parent() != PandoraNuIDs[0]) // Only daughters
+                continue;
             auto const &Pfp_vtx = PandoraPfp_vtx.at(iPfp);
 
             nPFParticleVtxDaughters += Pfp_vtx.size();
 
-            for (size_t i = 0; i < Pfp_vtx.size(); i++)
+            if (!Pfp_vtx.empty())
             {
-                auto const thisVtxPfp = Pfp_vtx[i];
-                VtxStatus.push_back(thisVtxPfp->status());
-                VtxID.push_back(thisVtxPfp->ID());
-                thisVtxPfp->XYZ(XYZ);
-                VtxXYZ.push_back(XYZ);
+                for (size_t i = 0; i < Pfp_vtx.size(); i++)
+                {
+                    auto const thisVtxPfp = Pfp_vtx[i];
+                    VtxStatus.push_back(thisVtxPfp->status());
+                    VtxID.push_back(thisVtxPfp->ID());
+                    thisVtxPfp->XYZ(XYZ);
+                    VtxXYZ.push_back(XYZ);
+                }
             }
         }
 
         for (size_t iPfp = 0; iPfp < PandoraPfparticleObjs.size(); iPfp++)
         {
 
+            if (PandoraPfparticleObjs[iPfp].Parent() != PandoraNuIDs[0]) // Only daughters
+                continue;
             auto const &Pfp_swr = PandoraPfp_Swr.at(iPfp);
 
             nPFParticleSwrDaughters += Pfp_swr.size();
 
-            for (size_t i = 0; i < Pfp_swr.size(); i++)
+            if (!Pfp_swr.empty())
             {
+                for (size_t i = 0; i < Pfp_swr.size(); i++)
+                {
 
-                auto const thisSwrPfp = Pfp_swr[i];
+                    auto const thisSwrPfp = Pfp_swr[i];
 
-                SwrID.push_back(thisSwrPfp->ID());
-                SwrDirection.push_back(thisSwrPfp->Direction());
-                SwrDirectionErr.push_back(thisSwrPfp->DirectionErr());
-                SwrShowerStart.push_back(thisSwrPfp->ShowerStart());
-                SwrShowerStartErr.push_back(thisSwrPfp->ShowerStartErr());
+                    SwrID.push_back(thisSwrPfp->ID());
+                    SwrDirection.push_back(thisSwrPfp->Direction());
+                    SwrDirectionErr.push_back(thisSwrPfp->DirectionErr());
+                    SwrShowerStart.push_back(thisSwrPfp->ShowerStart());
+                    SwrShowerStartErr.push_back(thisSwrPfp->ShowerStartErr());
+                }
             }
         }
 
