@@ -1,9 +1,9 @@
 /**
  * @file BDMReco.cc
- * @author Leonardo Peres (leoperes@pos.if.ufrj.br)
+ * @author Leonardo Peres (leoperes@pos.if.ufrj.br) and Gianluca Petrillo (petrillo@slac.stanford.edu)
  * @brief  Analyzer of Reconstructed information of Boosted Dark Matter
- * @version 0.2
- * @date 2021-03-26
+ * @version 0.3
+ * @date 2021-04-07
  * 
  * 
  * @copyright Copyright (c) 2021
@@ -70,19 +70,14 @@
 #include "gallery/Event.h"
 #include "gallery/ValidHandle.h"
 
-#include "art_root_io/TFileService.h"
-//#include "art/Framework/Core/EDAnalyzer.h"
-#include "art/Framework/Services/Registry/ServiceHandle.h"
-//#include "art/Utilities/SharedResource.h"
 //#include "fhiclcpp/ParameterSet.h"
-//#include "art/Framework/Core/ModuleMacros.h"
-#include "art/Framework/Principal/Handle.h"
 
 // LArSoft, nutools includes
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "nusimdata/SimulationBase/MCNeutrino.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "lardataobj/Simulation/GeneratedParticleInfo.h"
+#include "test/Geometry/geometry_unit_test_base.h"
 #include "larcorealg/Geometry/geo_vectors_utils.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
 #include "lardataobj/RecoBase/Track.h"
@@ -97,13 +92,122 @@
 
 //Geometry includes
 #include "larcore/Geometry/Geometry.h"
+#include "test/Geometry/geometry_unit_test_base.h"
 //#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
-//#include "lardata/Utilities/GeometryUtilities.h"
-//#include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
+#include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
+
+// DUNE libraries
+#include "dune/Geometry/DuneApaChannelMapAlg.h"
+#include "dune/Geometry/GeoObjectSorterAPA.h"
 
 // PARTICLES PDG CODES
 
 #define OUT_DM_CODE 2000010000
+
+//===========================================================================
+
+struct DUNEGeometry10kt_1x2x6_EnvironmentConfiguration
+  : public testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>
+{
+  using base_t
+    = testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>;
+  
+  /// Default constructor
+  DUNEGeometry10kt_1x2x6_EnvironmentConfiguration() { DefaultInit(); }
+  
+  /// Constructor; accepts the name as parameter
+  DUNEGeometry10kt_1x2x6_EnvironmentConfiguration(std::string name):
+    DUNEGeometry10kt_1x2x6_EnvironmentConfiguration()
+    { base_t::SetApplicationName(name); }
+  
+  
+    private:
+  void DefaultInit()
+    {
+      // overwrite the configuration that happened in the base class:
+      base_t::SetApplicationName("DUNEapp");
+      base_t::SetDefaultGeometryConfiguration(R"(
+        SurfaceY:        147828 # underground, 4850 feet to cm (DUNE DocDB-3833)
+        Name:             "dune10kt_v1_1x2x6"
+        GDML:             "dune10kt_v1_1x2x6.gdml"
+        ROOT:             "dune10kt_v1_1x2x6.gdml"
+        SortingParameters: { ChannelsPerOpDet: 1 }
+        DisableWiresInG4:  true
+        )");
+    }
+}; // class DUNEGeometry10kt_1x2x6_EnvironmentConfiguration
+
+class DUNE10kt_1x2x6_Services
+  : public testing::GeometryTesterEnvironment<DUNEGeometry10kt_1x2x6_EnvironmentConfiguration>
+{
+    public:
+  using Config_t = DUNEGeometry10kt_1x2x6_EnvironmentConfiguration;
+  using Base_t = testing::GeometryTesterEnvironment<Config_t>;
+
+  DUNE10kt_1x2x6_Services(Config_t config): Base_t(std::move(config), false)
+    { Setup(); }
+  
+    protected:
+  virtual std::unique_ptr<geo::GeometryCore> CreateNewGeometry() const override
+    {
+      /*
+       * rewritten because the initialization of the channel mapping is custom
+       */
+      std::string ProviderParameterSetPath
+        = this->Config().GeometryParameterSetPath();
+
+      //
+      // create the new geometry service provider
+      //
+      fhicl::ParameterSet ProviderConfig
+        = this->Parameters().template get<fhicl::ParameterSet>
+          (ProviderParameterSetPath);
+      auto new_geom = std::make_unique<geo::GeometryCore>(ProviderConfig);
+
+      std::string RelativePath
+        = ProviderConfig.get< std::string>("RelativePath", "");
+
+      std::string
+        GDMLFileName = RelativePath + ProviderConfig.get<std::string>("GDML"),
+        ROOTFileName = RelativePath + ProviderConfig.get<std::string>("ROOT");
+
+      // Search all reasonable locations for the geometry file;
+      // we see if by any chance art's FW_SEARCH_PATH directory is set and try
+      // there;
+      // if not, we do expect the path to be complete enough for ROOT to cope.
+      cet::search_path sp("FW_SEARCH_PATH");
+
+      std::string ROOTfile;
+      if (!sp.find_file(ROOTFileName, ROOTfile)) ROOTfile = ROOTFileName;
+
+      // we really don't care of GDML file, since we are not going to run Geant4
+      std::string GDMLfile;
+      if (!sp.find_file(GDMLFileName, GDMLfile)) {
+        mf::LogWarning("CreateNewGeometry") << "GDML file '"
+          << GDMLfile << "' not found.";
+      }
+
+      // initialize the geometry with the files we have found
+      new_geom->LoadGeometryFile(GDMLfile, ROOTfile);
+
+      //
+      // create the new channel map
+      //
+      fhicl::ParameterSet SortingParameters
+        = ProviderConfig.get<fhicl::ParameterSet>("SortingParameters", {});
+      auto pChannelMap
+        = std::make_unique<geo::DuneApaChannelMapAlg>(SortingParameters);
+      pChannelMap->setSorter(*new geo::GeoObjectSorterAPA(SortingParameters));
+
+      // connect the channel map with the geometry, that shares ownsership
+      // (we give up ours at the end of this method)
+      new_geom->ApplyChannelMap(std::move(pChannelMap));
+
+      return new_geom;
+    } // CreateNewGeometry()
+  
+}; // class DUNE10kt_1x2x6_Services
+
 
 //===========================================================================
 
@@ -279,7 +383,7 @@ bool insideFV(geo::Point_t const &vertex)
 
 //geo::GeometryCore const* geom;
 //lar::providerFrom<geo::Geometry>() = geom ;
-/*
+
 void GeoLimits(float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
 
     // Get geometry.
@@ -319,18 +423,24 @@ void GeoLimits(float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
     fFidVolZmin = minz + fFidVolCutZ;
     fFidVolZmax = maxz - fFidVolCutZ;
 } // GeoLimits()
-*/
+
 
 int main(int argc, char **argv)
 {
-
-    //std::string ListOfFiles;
-    std::ifstream ListOfFiles(argv[1]);
-
+    
     std::vector<std::string> filenames;
-    std::copy(std::istream_iterator<std::string>(ListOfFiles),
-              std::istream_iterator<std::string>(),
-              std::back_inserter(filenames));
+    std::string const InputSpec = argv[1];
+    if (InputSpec.length() > 5U && InputSpec.substr(InputSpec.length() - 5U) == ".root") {
+      filenames.push_back(InputSpec);
+    }
+    else {
+      //std::string ListOfFiles;
+      std::ifstream ListOfFiles(InputSpec);
+
+      std::copy(std::istream_iterator<std::string>(ListOfFiles),
+                std::istream_iterator<std::string>(),
+                std::back_inserter(filenames));
+    }
 
     for (size_t i = 0; i < filenames.size(); i++)
     {
@@ -369,6 +479,13 @@ int main(int argc, char **argv)
     TFile *fOut = new TFile("BDM_RecoParticles.root", "RECREATE");
     TTree *fTree = new TTree("RecoParticles", " Reco Info from BDM sample");
 
+    // summon the geometry, using hard-coded configuration (`DefaultInit()`):
+    DUNEGeometry10kt_1x2x6_EnvironmentConfiguration config("BDMreco");
+    DUNE10kt_1x2x6_Services DUNEenvironment(config);
+
+    geo::GeometryCore const& geom
+      = *(DUNEenvironment.Provider<geo::GeometryCore>());
+    
     double XYZ[3] = {0.0, 0.0, 0.0};
     // double DaughterStartPoint_tmp[3] = {0.0, 0.0, 0.0};
     // double DaughterStartDirection_tmp[3] = {0.0, 0.0, 0.0};
@@ -555,8 +672,8 @@ int main(int argc, char **argv)
 
                     // ASSOCIATION OF TRACKS WITH CALORIMETRY ===> PFP+TRK+CAL ===============================================
 
-                    //bool tmp_isContained = insideFV(thisTrkPfp->End());
-                    //td.track_isContained.push_back(tmp_isContained);
+                    bool tmp_isContained = insideFV(thisTrkPfp->End());
+                    td.track_isContained.push_back(tmp_isContained);
 
                     auto const &Trk_cal = PandoraTrk_Cal.at(i);
                     if (Trk_cal.empty())
