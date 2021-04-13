@@ -2,7 +2,7 @@
  * @file BDMReco.cc
  * @author Leonardo Peres (leoperes@pos.if.ufrj.br) and Gianluca Petrillo (petrillo@slac.stanford.edu)
  * @brief  Analyzer of Reconstructed information of Boosted Dark Matter
- * @version 0.3
+ * @version 0.4
  * @date 2021-04-07
  * 
  * 
@@ -60,6 +60,7 @@
 #include "TLorentzVector.h"
 #include "Math/GenVector/PxPyPzE4D.h"
 #include "TVector3.h"
+
 
 // "art" includes (canvas, and gallery)
 #include "canvas/Utilities/InputTag.h"
@@ -218,7 +219,7 @@ struct TreeData
 {
 
     int inteventno, intrunno, intsubrunno, nPrimaries, nPFParticle, nPFParticleVtxDaughters, nPFParticleTrkDaughters, nPFParticleSwrDaughters;
-    std::vector<double> DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs, SwrID, DaughterTrackKE, DaughterTrackRange, DaughterTrackPitch, DaughterTrackMomentumIfMuon, DaughterTrackMomentumIfProton, DaughterMomentumMultiScatter;
+    std::vector<double> DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs, SwrID, DaughterTrackKE, DaughterTrackRange, DaughterTrackPitch, DaughterTrackMomentumIfMuon, DaughterTrackMomentumIfProton, DaughterMomentumMultiScatter,InDMMomentum, InDMEnergy, OutDMMomentum, OutDMEnergy;
     std::vector<int> best_plane_pid, nTrk_Cal, nTrk_Pid, PFParticleID, VtxStatus, VtxID, PFP_PdgCode, PFP_Parent, intCCNC, nDaughters, Mode, InteractionType, Swrbest_plane;
     std::vector<TVector3> VtxXYZ, DaughterVertexTrack, SwrDirection, SwrDirectionErr, SwrShowerStart, SwrShowerStartErr;
     std::vector<TVector3> DaughterStartPoint, DaughterStartDirection, SunDirectionFromTrueBDM, DaughterEndPoint, DaughterMultiScatterStartingPoint;
@@ -226,6 +227,7 @@ struct TreeData
     std::vector<std::vector<float>> DaughterTrackdEdx, DaughterTrackResidualRange;
     std::vector<std::vector<int>> track_PID_pdg;
     std::vector<bool> track_isContained, IsVtxPrimary, IsVtxDaughter;
+    std::vector<TLorentzVector> PrimaryBDMVertex;
     TVector3 TotalMomEvent;
 
     void InitTreeGen(TTree *pTree);
@@ -299,6 +301,14 @@ void TreeData::InitTreeGen(TTree *pTree)
     pTree->Branch("DaughterTrackMomentumIfProton", &DaughterTrackMomentumIfProton);
     pTree->Branch("DaughterMomentumMultiScatter", &DaughterMomentumMultiScatter);
     pTree->Branch("DaughterMultiScatterStartingPoint", &DaughterMultiScatterStartingPoint);
+    
+    pTree->Branch("PrimaryBDMVertex", &PrimaryBDMVertex);
+    pTree->Branch("InDMMomentum", &InDMMomentum);
+    pTree->Branch("InDMEnergy", &InDMEnergy);
+    pTree->Branch("OutDMMomentum", &OutDMMomentum);
+    pTree->Branch("OutDMEnergy", &OutDMEnergy);
+
+
 
 } // TreeData::InitTreeGen()
 
@@ -353,14 +363,19 @@ void TreeData::ResetCounters()
     DaughterEndPoint.clear();
     IsVtxPrimary.clear();
     IsVtxDaughter.clear();
-
     DaughterTrackMomentumIfMuon.clear();
     DaughterTrackMomentumIfProton.clear();
     DaughterMomentumMultiScatter.clear();
     DaughterMultiScatterStartingPoint.clear();
+    PrimaryBDMVertex.clear();
+    InDMMomentum.clear();
+    InDMEnergy.clear();
+    OutDMMomentum.clear();
+    OutDMEnergy.clear();
 
 } // TreeData::ResetCounters()
 
+//Detector Limits =========================
 float fFidVolXmin = 0;
 float fFidVolXmax = 0;
 float fFidVolYmin = 0;
@@ -384,10 +399,8 @@ bool insideFV(geo::Point_t const &vertex)
 //geo::GeometryCore const* geom;
 //lar::providerFrom<geo::Geometry>() = geom ;
 
-void GeoLimits(float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
+void GeoLimits(geo::GeometryCore const& geom,float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
 
-    // Get geometry.
-    art::ServiceHandle<geo::Geometry> geo;
     // Define histogram boundaries (cm).
     // For now only draw cryostat=0.
     double minx = 1e9;
@@ -396,24 +409,24 @@ void GeoLimits(float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
     double maxy = -1e9;
     double minz = 1e9;
     double maxz = -1e9;
-    for (size_t i = 0; i < geo->NTPC(); ++i)
+    for (size_t i = 0; i < geom.NTPC(); ++i)
     {
         double local[3] = {0., 0., 0.};
         double world[3] = {0., 0., 0.};
-        const geo::TPCGeo &tpc = geo->TPC(i);
+        const geo::TPCGeo &tpc = geom.TPC(i);
         tpc.LocalToWorld(local, world);
-        if (minx > world[0] - geo->DetHalfWidth(i))
-            minx = world[0] - geo->DetHalfWidth(i);
-        if (maxx < world[0] + geo->DetHalfWidth(i))
-            maxx = world[0] + geo->DetHalfWidth(i);
-        if (miny > world[1] - geo->DetHalfHeight(i))
-            miny = world[1] - geo->DetHalfHeight(i);
-        if (maxy < world[1] + geo->DetHalfHeight(i))
-            maxy = world[1] + geo->DetHalfHeight(i);
-        if (minz > world[2] - geo->DetLength(i) / 2.)
-            minz = world[2] - geo->DetLength(i) / 2.;
-        if (maxz < world[2] + geo->DetLength(i) / 2.)
-            maxz = world[2] + geo->DetLength(i) / 2.;
+        if (minx > world[0] - geom.DetHalfWidth(i))
+            minx = world[0] - geom.DetHalfWidth(i);
+        if (maxx < world[0] + geom.DetHalfWidth(i))
+            maxx = world[0] + geom.DetHalfWidth(i);
+        if (miny > world[1] - geom.DetHalfHeight(i))
+            miny = world[1] - geom.DetHalfHeight(i);
+        if (maxy < world[1] + geom.DetHalfHeight(i))
+            maxy = world[1] + geom.DetHalfHeight(i);
+        if (minz > world[2] - geom.DetLength(i) / 2.)
+            minz = world[2] - geom.DetLength(i) / 2.;
+        if (maxz < world[2] + geom.DetLength(i) / 2.)
+            maxz = world[2] + geom.DetLength(i) / 2.;
     }
 
     fFidVolXmin = minx + fFidVolCutX;
@@ -497,7 +510,7 @@ int main(int argc, char **argv)
 
     trkf::TrackMomentumCalculator trkm;
 
-    //GeoLimits(10,10,10); // GET DETECTOR GEOMETRY LIMITS exclude 10cm in each axis===============================================================
+    GeoLimits(geom, 10, 10, 10); // GET DETECTOR GEOMETRY LIMITS exclude 10cm in each axis===============================================================
 
     for (gallery::Event ev(filenames); !ev.atEnd(); ev.next())
     {
@@ -528,7 +541,7 @@ int main(int argc, char **argv)
         auto const &MCTruthHandle = ev.getValidHandle<std::vector<simb::MCTruth>>(fGeneratorLabel);
         auto const &MCTruthObjs = *MCTruthHandle;
 
-        // SAVE TRUE INTERACTION CC OR NC   // 0=CC 1=NC =================================
+        // SAVE TRUE INTERACTION INFOR (GENERATOR) FROM SIGNAL  // 0=CC 1=NC =================================
 
         for (size_t i = 0; i < MCTruthObjs.size(); i++)
         {
@@ -542,6 +555,7 @@ int main(int argc, char **argv)
             int nParticles = MCTruthObj.NParticles();
 
             TLorentzVector DMMomentum;
+            TLorentzVector DMInteracPosition;
 
             for (int iParticle = 0; iParticle < nParticles; ++iParticle)
             {
@@ -551,14 +565,24 @@ int main(int argc, char **argv)
 
                 if (pdgCode == OUT_DM_CODE && MCParticleObjDMIn.StatusCode() == 0)
                 {
-
                     DMMomentum = MCParticleObjDMIn.Momentum(0);
+                    DMInteracPosition = MCParticleObjDMIn.Position(0);
                     td.SunDirectionFromTrueBDM.push_back(DMMomentum.Vect().Unit()); // SAVE SUN DIRECTION !!!
+                    td.PrimaryBDMVertex.push_back(DMInteracPosition);
+                    td.InDMMomentum.push_back(MCParticleObjDMIn.P(0));
+                    td.InDMEnergy.push_back(MCParticleObjDMIn.E(0));
+
+                } else if (pdgCode == OUT_DM_CODE && (MCParticleObjDMIn.StatusCode() == 1 || MCParticleObjDMIn.StatusCode() == 15 ) )
+                {
+                    td.OutDMMomentum.push_back(MCParticleObjDMIn.P(0));
+                    td.OutDMEnergy.push_back(MCParticleObjDMIn.E(0));                 
                 }
+                
             }
         }
-
-        // RECO INFORMATION ===============================================
+   
+        
+        // RECO INFORMATION ==================================================================
 
         auto const &TrackListHandle = ev.getValidHandle<std::vector<recob::Track>>(fPandoraTrackModuleLabel);
         auto const &PandoraTrackObjs = *TrackListHandle;
@@ -753,11 +777,8 @@ int main(int argc, char **argv)
                     td.SwrShowerStart.push_back(thisSwrPfp->ShowerStart());
                     td.SwrShowerStartErr.push_back(thisSwrPfp->ShowerStartErr());
                     td.Swrbest_plane.push_back(thisSwrPfp->best_plane());
-                    // std::cout << "thisSwrPfp->best_plane() = " << thisSwrPfp->best_plane() << std::endl;
                     td.SwrEnergy.push_back(thisSwrPfp->Energy());
-                    // std::cout << "thisSwrPfp->Energy().size() = " << thisSwrPfp->Energy().size() << std::endl;
 
-                    // for (size_t j = 0; j < shower->Energy().size(); j++) sh_energy[i][j] = shower->Energy()[j];
                 }
             }
         }
