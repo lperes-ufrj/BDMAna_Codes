@@ -2,8 +2,8 @@
  * @file BDMReco.cc
  * @author Leonardo Peres (leoperes@pos.if.ufrj.br) and Gianluca Petrillo (petrillo@slac.stanford.edu)
  * @brief  Analyzer of Reconstructed information of Boosted Dark Matter
- * @version 0.4
- * @date 2021-04-07
+ * @version 0.5
+ * @date 2021-04-21
  * 
  * 
  * @copyright Copyright (c) 2021
@@ -58,9 +58,8 @@
 #include "TTree.h"
 #include "TH1F.h"
 #include "TLorentzVector.h"
-#include "Math/GenVector/PxPyPzE4D.h"
+#include "Math/GenVector/LorentzVector.h"
 #include "TVector3.h"
-
 
 // "art" includes (canvas, and gallery)
 #include "canvas/Utilities/InputTag.h"
@@ -108,26 +107,25 @@
 //===========================================================================
 
 struct DUNEGeometry10kt_1x2x6_EnvironmentConfiguration
-  : public testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>
+    : public testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>
 {
-  using base_t
-    = testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>;
-  
-  /// Default constructor
-  DUNEGeometry10kt_1x2x6_EnvironmentConfiguration() { DefaultInit(); }
-  
-  /// Constructor; accepts the name as parameter
-  DUNEGeometry10kt_1x2x6_EnvironmentConfiguration(std::string name):
-    DUNEGeometry10kt_1x2x6_EnvironmentConfiguration()
-    { base_t::SetApplicationName(name); }
-  
-  
-    private:
-  void DefaultInit()
+    using base_t = testing::BasicGeometryEnvironmentConfiguration<geo::DuneApaChannelMapAlg>;
+
+    /// Default constructor
+    DUNEGeometry10kt_1x2x6_EnvironmentConfiguration() { DefaultInit(); }
+
+    /// Constructor; accepts the name as parameter
+    DUNEGeometry10kt_1x2x6_EnvironmentConfiguration(std::string name) : DUNEGeometry10kt_1x2x6_EnvironmentConfiguration()
     {
-      // overwrite the configuration that happened in the base class:
-      base_t::SetApplicationName("DUNEapp");
-      base_t::SetDefaultGeometryConfiguration(R"(
+        base_t::SetApplicationName(name);
+    }
+
+private:
+    void DefaultInit()
+    {
+        // overwrite the configuration that happened in the base class:
+        base_t::SetApplicationName("DUNEapp");
+        base_t::SetDefaultGeometryConfiguration(R"(
         SurfaceY:        147828 # underground, 4850 feet to cm (DUNE DocDB-3833)
         Name:             "dune10kt_v1_1x2x6"
         GDML:             "dune10kt_v1_1x2x6.gdml"
@@ -139,76 +137,73 @@ struct DUNEGeometry10kt_1x2x6_EnvironmentConfiguration
 }; // class DUNEGeometry10kt_1x2x6_EnvironmentConfiguration
 
 class DUNE10kt_1x2x6_Services
-  : public testing::GeometryTesterEnvironment<DUNEGeometry10kt_1x2x6_EnvironmentConfiguration>
+    : public testing::GeometryTesterEnvironment<DUNEGeometry10kt_1x2x6_EnvironmentConfiguration>
 {
-    public:
-  using Config_t = DUNEGeometry10kt_1x2x6_EnvironmentConfiguration;
-  using Base_t = testing::GeometryTesterEnvironment<Config_t>;
+public:
+    using Config_t = DUNEGeometry10kt_1x2x6_EnvironmentConfiguration;
+    using Base_t = testing::GeometryTesterEnvironment<Config_t>;
 
-  DUNE10kt_1x2x6_Services(Config_t config): Base_t(std::move(config), false)
-    { Setup(); }
-  
-    protected:
-  virtual std::unique_ptr<geo::GeometryCore> CreateNewGeometry() const override
+    DUNE10kt_1x2x6_Services(Config_t config) : Base_t(std::move(config), false)
     {
-      /*
+        Setup();
+    }
+
+protected:
+    virtual std::unique_ptr<geo::GeometryCore> CreateNewGeometry() const override
+    {
+        /*
        * rewritten because the initialization of the channel mapping is custom
        */
-      std::string ProviderParameterSetPath
-        = this->Config().GeometryParameterSetPath();
+        std::string ProviderParameterSetPath = this->Config().GeometryParameterSetPath();
 
-      //
-      // create the new geometry service provider
-      //
-      fhicl::ParameterSet ProviderConfig
-        = this->Parameters().template get<fhicl::ParameterSet>
-          (ProviderParameterSetPath);
-      auto new_geom = std::make_unique<geo::GeometryCore>(ProviderConfig);
+        //
+        // create the new geometry service provider
+        //
+        fhicl::ParameterSet ProviderConfig = this->Parameters().template get<fhicl::ParameterSet>(ProviderParameterSetPath);
+        auto new_geom = std::make_unique<geo::GeometryCore>(ProviderConfig);
 
-      std::string RelativePath
-        = ProviderConfig.get< std::string>("RelativePath", "");
+        std::string RelativePath = ProviderConfig.get<std::string>("RelativePath", "");
 
-      std::string
-        GDMLFileName = RelativePath + ProviderConfig.get<std::string>("GDML"),
-        ROOTFileName = RelativePath + ProviderConfig.get<std::string>("ROOT");
+        std::string
+            GDMLFileName = RelativePath + ProviderConfig.get<std::string>("GDML"),
+            ROOTFileName = RelativePath + ProviderConfig.get<std::string>("ROOT");
 
-      // Search all reasonable locations for the geometry file;
-      // we see if by any chance art's FW_SEARCH_PATH directory is set and try
-      // there;
-      // if not, we do expect the path to be complete enough for ROOT to cope.
-      cet::search_path sp("FW_SEARCH_PATH");
+        // Search all reasonable locations for the geometry file;
+        // we see if by any chance art's FW_SEARCH_PATH directory is set and try
+        // there;
+        // if not, we do expect the path to be complete enough for ROOT to cope.
+        cet::search_path sp("FW_SEARCH_PATH");
 
-      std::string ROOTfile;
-      if (!sp.find_file(ROOTFileName, ROOTfile)) ROOTfile = ROOTFileName;
+        std::string ROOTfile;
+        if (!sp.find_file(ROOTFileName, ROOTfile))
+            ROOTfile = ROOTFileName;
 
-      // we really don't care of GDML file, since we are not going to run Geant4
-      std::string GDMLfile;
-      if (!sp.find_file(GDMLFileName, GDMLfile)) {
-        mf::LogWarning("CreateNewGeometry") << "GDML file '"
-          << GDMLfile << "' not found.";
-      }
+        // we really don't care of GDML file, since we are not going to run Geant4
+        std::string GDMLfile;
+        if (!sp.find_file(GDMLFileName, GDMLfile))
+        {
+            mf::LogWarning("CreateNewGeometry") << "GDML file '"
+                                                << GDMLfile << "' not found.";
+        }
 
-      // initialize the geometry with the files we have found
-      new_geom->LoadGeometryFile(GDMLfile, ROOTfile);
+        // initialize the geometry with the files we have found
+        new_geom->LoadGeometryFile(GDMLfile, ROOTfile);
 
-      //
-      // create the new channel map
-      //
-      fhicl::ParameterSet SortingParameters
-        = ProviderConfig.get<fhicl::ParameterSet>("SortingParameters", {});
-      auto pChannelMap
-        = std::make_unique<geo::DuneApaChannelMapAlg>(SortingParameters);
-      pChannelMap->setSorter(*new geo::GeoObjectSorterAPA(SortingParameters));
+        //
+        // create the new channel map
+        //
+        fhicl::ParameterSet SortingParameters = ProviderConfig.get<fhicl::ParameterSet>("SortingParameters", {});
+        auto pChannelMap = std::make_unique<geo::DuneApaChannelMapAlg>(SortingParameters);
+        pChannelMap->setSorter(*new geo::GeoObjectSorterAPA(SortingParameters));
 
-      // connect the channel map with the geometry, that shares ownsership
-      // (we give up ours at the end of this method)
-      new_geom->ApplyChannelMap(std::move(pChannelMap));
+        // connect the channel map with the geometry, that shares ownsership
+        // (we give up ours at the end of this method)
+        new_geom->ApplyChannelMap(std::move(pChannelMap));
 
-      return new_geom;
+        return new_geom;
     } // CreateNewGeometry()
-  
-}; // class DUNE10kt_1x2x6_Services
 
+}; // class DUNE10kt_1x2x6_Services
 
 //===========================================================================
 
@@ -218,17 +213,19 @@ using KinematicMap_t = std::map<int, std::vector<double>>;
 struct TreeData
 {
 
-    int inteventno, intrunno, intsubrunno, nPrimaries, nPFParticle, nPFParticleVtxDaughters, nPFParticleTrkDaughters, nPFParticleSwrDaughters;
-    std::vector<double> DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs, SwrID, DaughterTrackKE, DaughterTrackRange, DaughterTrackPitch, DaughterTrackMomentumIfMuon, DaughterTrackMomentumIfProton, DaughterMomentumMultiScatter,InDMMomentum, InDMEnergy, OutDMMomentum, OutDMEnergy;
-    std::vector<int> best_plane_pid, nTrk_Cal, nTrk_Pid, PFParticleID, VtxStatus, VtxID, PFP_PdgCode, PFP_Parent, intCCNC, nDaughters, Mode, InteractionType, Swrbest_plane;
+    int inteventno, intrunno, intsubrunno, nPrimaries, nPFParticle, nPFParticleVtxDaughters, nPFParticleSwrDaughters;
+    std::vector<double> MC_StartEnergy, MC_EndEnergy, DaughterTrackLengths, DaughterStartMomentumTrack, DaughterEndMomentumTrack, PandoraNuIDs, SwrID, DaughterTrackKE, DaughterTrackRange, DaughterTrackPitch, DaughterTrackMomentumIfMuon, DaughterTrackMomentumIfProton, DaughterMomentumMultiScatter, InDMMomentum, InDMEnergy, OutDMMomentum, OutDMEnergy;
+    std::vector<int> MC_NumberDaughters, MC_Mother, MC_PdgCode, MC_TrackId, best_plane_pid, nTrk_Cal, nTrk_Pid, PFParticleID, VtxStatus, VtxID, PFP_PdgCode, PFP_Parent, nPFParticleTrkDaughters, PFPNumber, intCCNC, nDaughters, Mode, InteractionType, Swrbest_plane;
     std::vector<TVector3> VtxXYZ, DaughterVertexTrack, SwrDirection, SwrDirectionErr, SwrShowerStart, SwrShowerStartErr;
     std::vector<TVector3> DaughterStartPoint, DaughterStartDirection, SunDirectionFromTrueBDM, DaughterEndPoint, DaughterMultiScatterStartingPoint;
+    std::vector<std::string> MC_Process, MC_EndProcess;
     std::vector<std::vector<double>> SwrEnergy, chi2proton;
     std::vector<std::vector<float>> DaughterTrackdEdx, DaughterTrackResidualRange;
     std::vector<std::vector<int>> track_PID_pdg;
-    std::vector<bool> track_isContained, IsVtxPrimary, IsVtxDaughter;
-    std::vector<TLorentzVector> PrimaryBDMVertex;
+    std::vector<bool> track_isContained, isMCinside, IsVtxPrimary, IsVtxDaughter;
+    std::vector<TVector3> PrimaryBDMVertex;
     TVector3 TotalMomEvent;
+    std::vector<TVector3> MC_Position, MC_EndPosition, MC_Momentum, MC_EndMomentum;
 
     void InitTreeGen(TTree *pTree);
     void ResetCounters();
@@ -301,14 +298,28 @@ void TreeData::InitTreeGen(TTree *pTree)
     pTree->Branch("DaughterTrackMomentumIfProton", &DaughterTrackMomentumIfProton);
     pTree->Branch("DaughterMomentumMultiScatter", &DaughterMomentumMultiScatter);
     pTree->Branch("DaughterMultiScatterStartingPoint", &DaughterMultiScatterStartingPoint);
-    
+
     pTree->Branch("PrimaryBDMVertex", &PrimaryBDMVertex);
     pTree->Branch("InDMMomentum", &InDMMomentum);
     pTree->Branch("InDMEnergy", &InDMEnergy);
     pTree->Branch("OutDMMomentum", &OutDMMomentum);
     pTree->Branch("OutDMEnergy", &OutDMEnergy);
 
+    pTree->Branch("PFPNumber", &PFPNumber);
 
+    pTree->Branch("MC_TrackId", &MC_TrackId);
+    pTree->Branch("MC_PdgCode", &MC_PdgCode);
+    pTree->Branch("MC_Mother", &MC_Mother);
+    pTree->Branch("MC_Process", &MC_Process);
+    pTree->Branch("MC_EndProcess", &MC_EndProcess);
+    pTree->Branch("MC_NumberDaughters", &MC_NumberDaughters);
+    pTree->Branch("MC_Position", &MC_Position);
+    pTree->Branch("MC_EndPosition", &MC_EndPosition);
+    pTree->Branch("MC_Momentum", &MC_Momentum);
+    pTree->Branch("MC_EndMomentum", &MC_EndMomentum);
+    pTree->Branch("MC_StartEnergy", &MC_StartEnergy);
+    pTree->Branch("MC_EndEnergy", &MC_EndEnergy);
+    pTree->Branch("isMCinside", &isMCinside);
 
 } // TreeData::InitTreeGen()
 
@@ -325,7 +336,7 @@ void TreeData::ResetCounters()
     PFParticleID.clear();
     nPFParticle = 0;
     nPFParticleVtxDaughters = 0;
-    nPFParticleTrkDaughters = 0;
+    nPFParticleTrkDaughters.clear();
     nPFParticleSwrDaughters = 0;
     VtxStatus.clear();
     VtxID.clear();
@@ -372,6 +383,20 @@ void TreeData::ResetCounters()
     InDMEnergy.clear();
     OutDMMomentum.clear();
     OutDMEnergy.clear();
+    PFPNumber.clear();
+    MC_TrackId.clear();
+    MC_PdgCode.clear();
+    MC_Mother.clear();
+    MC_Process.clear();
+    MC_EndProcess.clear();
+    MC_NumberDaughters.clear();
+    MC_Position.clear();
+    MC_EndPosition.clear();
+    MC_Momentum.clear();
+    MC_EndMomentum.clear();
+    MC_StartEnergy.clear();
+    MC_EndEnergy.clear();
+    isMCinside.clear();
 
 } // TreeData::ResetCounters()
 
@@ -399,7 +424,8 @@ bool insideFV(geo::Point_t const &vertex)
 //geo::GeometryCore const* geom;
 //lar::providerFrom<geo::Geometry>() = geom ;
 
-void GeoLimits(geo::GeometryCore const& geom,float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ ) {
+void GeoLimits(geo::GeometryCore const &geom, float fFidVolCutX, float fFidVolCutY, float fFidVolCutZ)
+{
 
     // Define histogram boundaries (cm).
     // For now only draw cryostat=0.
@@ -437,22 +463,23 @@ void GeoLimits(geo::GeometryCore const& geom,float fFidVolCutX, float fFidVolCut
     fFidVolZmax = maxz - fFidVolCutZ;
 } // GeoLimits()
 
-
 int main(int argc, char **argv)
 {
-    
+
     std::vector<std::string> filenames;
     std::string const InputSpec = argv[1];
-    if (InputSpec.length() > 5U && InputSpec.substr(InputSpec.length() - 5U) == ".root") {
-      filenames.push_back(InputSpec);
+    if (InputSpec.length() > 5U && InputSpec.substr(InputSpec.length() - 5U) == ".root")
+    {
+        filenames.push_back(InputSpec);
     }
-    else {
-      //std::string ListOfFiles;
-      std::ifstream ListOfFiles(InputSpec);
+    else
+    {
+        //std::string ListOfFiles;
+        std::ifstream ListOfFiles(InputSpec);
 
-      std::copy(std::istream_iterator<std::string>(ListOfFiles),
-                std::istream_iterator<std::string>(),
-                std::back_inserter(filenames));
+        std::copy(std::istream_iterator<std::string>(ListOfFiles),
+                  std::istream_iterator<std::string>(),
+                  std::back_inserter(filenames));
     }
 
     for (size_t i = 0; i < filenames.size(); i++)
@@ -496,9 +523,8 @@ int main(int argc, char **argv)
     DUNEGeometry10kt_1x2x6_EnvironmentConfiguration config("BDMreco");
     DUNE10kt_1x2x6_Services DUNEenvironment(config);
 
-    geo::GeometryCore const& geom
-      = *(DUNEenvironment.Provider<geo::GeometryCore>());
-    
+    geo::GeometryCore const &geom = *(DUNEenvironment.Provider<geo::GeometryCore>());
+
     double XYZ[3] = {0.0, 0.0, 0.0};
     // double DaughterStartPoint_tmp[3] = {0.0, 0.0, 0.0};
     // double DaughterStartDirection_tmp[3] = {0.0, 0.0, 0.0};
@@ -541,7 +567,7 @@ int main(int argc, char **argv)
         auto const &MCTruthHandle = ev.getValidHandle<std::vector<simb::MCTruth>>(fGeneratorLabel);
         auto const &MCTruthObjs = *MCTruthHandle;
 
-        // SAVE TRUE INTERACTION INFOR (GENERATOR) FROM SIGNAL  // 0=CC 1=NC =================================
+        // SAVE TRUE INTERACTION INFO (GENERATOR) FROM SIGNAL  // 0=CC 1=NC =================================
 
         for (size_t i = 0; i < MCTruthObjs.size(); i++)
         {
@@ -552,12 +578,12 @@ int main(int argc, char **argv)
             td.InteractionType.push_back(thisNu.InteractionType());
             //std::cout << "thisNu.CCNC() = " << thisNu.CCNC() << std::endl;
 
-            int nParticles = MCTruthObj.NParticles();
+            int nGeneratorParticles = MCTruthObj.NParticles();
 
             TLorentzVector DMMomentum;
             TLorentzVector DMInteracPosition;
 
-            for (int iParticle = 0; iParticle < nParticles; ++iParticle)
+            for (int iParticle = 0; iParticle < nGeneratorParticles; ++iParticle)
             {
 
                 const simb::MCParticle &MCParticleObjDMIn = MCTruthObj.GetParticle(iParticle);
@@ -568,21 +594,50 @@ int main(int argc, char **argv)
                     DMMomentum = MCParticleObjDMIn.Momentum(0);
                     DMInteracPosition = MCParticleObjDMIn.Position(0);
                     td.SunDirectionFromTrueBDM.push_back(DMMomentum.Vect().Unit()); // SAVE SUN DIRECTION !!!
-                    td.PrimaryBDMVertex.push_back(DMInteracPosition);
+                    td.PrimaryBDMVertex.push_back(DMInteracPosition.Vect());
                     td.InDMMomentum.push_back(MCParticleObjDMIn.P(0));
                     td.InDMEnergy.push_back(MCParticleObjDMIn.E(0));
-
-                } else if (pdgCode == OUT_DM_CODE && (MCParticleObjDMIn.StatusCode() == 1 || MCParticleObjDMIn.StatusCode() == 15 ) )
+                }
+                else if (pdgCode == OUT_DM_CODE && (MCParticleObjDMIn.StatusCode() == 1 || MCParticleObjDMIn.StatusCode() == 15))
                 {
                     td.OutDMMomentum.push_back(MCParticleObjDMIn.P(0));
-                    td.OutDMEnergy.push_back(MCParticleObjDMIn.E(0));                 
+                    td.OutDMEnergy.push_back(MCParticleObjDMIn.E(0));
                 }
-                
             }
         }
-   
-        
-        // RECO INFORMATION ==================================================================
+
+        //SAVE GEANT4 INFO (TRUTH INFORMATION) ===============================================================
+        bool saveGeant = true; // BIG DATA, DO YOU REALLY WANT TO SAVE???
+
+        if (saveGeant)
+        {
+
+            int nGeantParticles = MCParticleObjs.size();
+            for (size_t i = 0; i < nGeantParticles; i++)
+            {
+                const simb::MCParticle MCParticleObj = MCParticleObjs[i];
+
+                    td.MC_TrackId.push_back(MCParticleObj.TrackId());
+                    td.MC_PdgCode.push_back(MCParticleObj.PdgCode());
+                    td.MC_Mother.push_back(MCParticleObj.Mother());
+                    td.MC_Process.push_back(MCParticleObj.Process());
+                    td.MC_EndProcess.push_back(MCParticleObj.EndProcess());
+                    td.MC_NumberDaughters.push_back(MCParticleObj.NumberDaughters());
+                    td.MC_Position.emplace_back(MCParticleObj.Position().X(), MCParticleObj.Position().Y(), MCParticleObj.Position().Z());
+                    td.MC_EndPosition.emplace_back(MCParticleObj.EndPosition().X(), MCParticleObj.EndPosition().Y(), MCParticleObj.EndPosition().Z());
+                    td.MC_Momentum.emplace_back(MCParticleObj.Px(), MCParticleObj.Py(), MCParticleObj.Pz());
+                    td.MC_StartEnergy.push_back(MCParticleObj.E(0));
+                    td.MC_EndMomentum.emplace_back(MCParticleObj.EndPx(), MCParticleObj.EndPy(), MCParticleObj.EndPz());
+                    td.MC_EndEnergy.push_back(MCParticleObj.EndE());
+
+                geo::Point_t EndMCPos(MCParticleObj.EndPosition().X(), MCParticleObj.EndPosition().Y(), MCParticleObj.EndPosition().Z());
+                bool isMCinside_tmp = insideFV(EndMCPos);
+                td.isMCinside.push_back(isMCinside_tmp);
+
+            }
+        }
+
+        // RECO INFORMATION ==================================================================================
 
         auto const &TrackListHandle = ev.getValidHandle<std::vector<recob::Track>>(fPandoraTrackModuleLabel);
         auto const &PandoraTrackObjs = *TrackListHandle;
@@ -593,7 +648,6 @@ int main(int argc, char **argv)
         auto const &VertexHandle = ev.getValidHandle<std::vector<recob::Vertex>>(fPandoraLabel);
         auto const &PandoraVertexObjs = *VertexHandle;
 
-        
         // ASSOCIATIONS PFP+TRACK, PFP+SHOWER, PFP+VERTEX, TRACK+CALO, TRACK+PID ==================
         art::FindManyP<recob::Track> PandoraPfp_trk(PfparticleHandle, ev, fPandoraTrackModuleLabel);
         art::FindManyP<recob::Shower> PandoraPfp_Swr(PfparticleHandle, ev, fPandoraShowerModuleLabel);
@@ -624,7 +678,7 @@ int main(int argc, char **argv)
         if (td.PandoraNuIDs.size() == 0)
             continue;
 
-        //FROM NOW ON, ONLY SAVE DAUGHTERS INFORMATION OF PANDORA NEUTRINOS PRIMARIES
+        //
 
         for (size_t iPfp = 0; iPfp < PandoraPfparticleObjs.size(); iPfp++)
         {
@@ -665,6 +719,8 @@ int main(int argc, char **argv)
                 }
             }
 
+            //FROM NOW ON, ONLY SAVE DAUGHTERS INFORMATION OF PANDORA NEUTRINOS PRIMARIES ===============
+
             if (PandoraPfparticleObjs[iPfp].Parent() != td.PandoraNuIDs[0]) // Only daughters from now on
                 continue;
 
@@ -672,7 +728,9 @@ int main(int argc, char **argv)
 
             auto const &Pfp_trk = PandoraPfp_trk.at(iPfp);
 
-            td.nPFParticleTrkDaughters += Pfp_trk.size();
+            td.PFPNumber.push_back(iPfp); // save particle flow obj ID.
+
+            td.nPFParticleTrkDaughters.push_back(Pfp_trk.size());
 
             if (!Pfp_trk.empty())
             {
@@ -685,7 +743,7 @@ int main(int argc, char **argv)
 
                     td.DaughterStartPoint.emplace_back(thisTrkPfp->Start().X(), thisTrkPfp->Start().Y(), thisTrkPfp->Start().Z());
                     td.DaughterEndPoint.emplace_back(thisTrkPfp->End().X(), thisTrkPfp->End().Y(), thisTrkPfp->End().Z());
-                    td.DaughterStartDirection.emplace_back(thisTrkPfp->StartDirection().X(), thisTrkPfp->StartDirection().Y(), thisTrkPfp->StartDirection().Z());         
+                    td.DaughterStartDirection.emplace_back(thisTrkPfp->StartDirection().X(), thisTrkPfp->StartDirection().Y(), thisTrkPfp->StartDirection().Z());
 
                     double Length = thisTrkPfp->Length();
                     //std::cout << "Track Length is: " << thisTrkPfp->Length() << std::endl;
@@ -746,15 +804,14 @@ int main(int argc, char **argv)
                             ndfbest_plane = ndfplane;
                             best_plane = p;
                         }
-                    
+
                         tmp_pdg.push_back(thisPid->Pdg());
                         tmp_chi2proton.push_back(thisPid->Chi2Proton());
                         td.track_PID_pdg.push_back(tmp_pdg);
                         td.chi2proton.push_back(tmp_chi2proton);
                     }
-                    
+
                     td.best_plane_pid.push_back(best_plane);
-                    
                 }
             }
 
@@ -778,7 +835,6 @@ int main(int argc, char **argv)
                     td.SwrShowerStartErr.push_back(thisSwrPfp->ShowerStartErr());
                     td.Swrbest_plane.push_back(thisSwrPfp->best_plane());
                     td.SwrEnergy.push_back(thisSwrPfp->Energy());
-
                 }
             }
         }
